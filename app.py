@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Response
+from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import os, random
-
+from enum import Enum 
 
 app = FastAPI()
 
@@ -13,14 +14,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class Types(Enum):
+    aesthetic = "aesthetic"
+    girly = "girly"
+    black_white = "black_white"
+    titled = "titled"
+
 base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'imgs')
 girly_path = os.path.join(base_path, 'girly')
 aesthetic_path = os.path.join(base_path, 'aesthetic')
+black_white_path = os.path.join(base_path, 'black_white')
+titled_path = os.path.join(base_path, 'titled')
 
-def get_images(n: int, p: int, type_: ('girly', 'aesthetic')):
-    path = girly_path if type_ == 'girly' else aesthetic_path
+pathes = {
+    Types.aesthetic: aesthetic_path,
+    Types.girly: girly_path,
+    Types.black_white: black_white_path,
+    Types.titled: titled_path
+}
 
-    return [os.path.join(type_, img)  for img in os.listdir(path)]
+def get_source_images(type_: Types):
+    path = pathes[type_]
+
+    return [os.path.join(type_.value, img)  for img in os.listdir(path)]
 
 
 @app.get(
@@ -32,29 +48,23 @@ def get_images(n: int, p: int, type_: ('girly', 'aesthetic')):
     },
 )
 async def show_image(src: str):
-    with open(os.path.join(base_path, src), 'rb') as f:
-        image = f.read()
-    return Response(content=image, media_type="image/png")
+    try:
+        return FileResponse(os.path.join(base_path, src), media_type="image/generic")
+    except:
+        return Response(status_code=404)
 
 
-@app.get("/getGirly")
-async def get_girly(n: int, p: int):
-    girly_images = get_images(n, p, 'girly')
-    # pagination
-    return girly_images[n*p-n:n*p]
-
-
-@app.get("/getAesthetic")
-async def get_aesthetic(n: int, p: int):
-    aesthetic_images = get_images(n, p, 'aesthetic')
+@app.get("/get_images")
+async def get_images(n: int, p: int, type_: Types):
+    images = get_source_images(type_)
     
     # pagination
-    return aesthetic_images[n*p-n:n*p]
+    return images[n*p-n:n*p]
 
 
 @app.get("/getRandom")
 async def get_random(n: int, p: int):
-    all_images = get_images(n, p, 'girly') + get_images(n, p, 'aesthetic')
+    all_images = get_source_images(Types.girly) + get_source_images(Types.aesthetic) + get_source_images(Types.titled) + get_source_images(Types.black_white)
     random.shuffle(all_images)
     
     # pagination
